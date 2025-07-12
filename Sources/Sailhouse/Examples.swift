@@ -24,7 +24,12 @@ public enum Examples {
         let eventWithMetadataId = try await client.publish(
             topic: "my-topic",
             event: MyEvent(message: "Hello with metadata", timestamp: Date()),
-            options: PublishEventOptions(metadata: ["source": "swift-sdk-example"])
+            options: PublishEventOptions(metadata: [
+                "source": "swift-sdk-example",
+                "version": "1.0",
+                "userId": 12345,
+                "isTest": true
+            ])
         )
         print("Published event with metadata, ID: \(eventWithMetadataId)")
 
@@ -62,6 +67,9 @@ public enum Examples {
 
         for event in events.events {
             print("Event ID: \(event.id), Message: \(event.data.message)")
+            if let metadata = event.metadata {
+                print("Event metadata: \(metadata)")
+            }
             try await event.ack()
         }
 
@@ -99,6 +107,9 @@ public enum Examples {
         let task = Task {
             for await event in stream {
                 print("Received event: \(event.data.message)")
+                if let metadata = event.metadata {
+                    print("Event metadata: \(metadata)")
+                }
                 try await event.ack()
             }
         }
@@ -113,6 +124,9 @@ public enum Examples {
             subscription: "my-subscription"
         ) { (event: Event<MyEvent>) in
             print("Received event via callback: \(event.data.message)")
+            if let metadata = event.metadata {
+                print("Event metadata: \(metadata)")
+            }
             try await event.ack()
         }
 

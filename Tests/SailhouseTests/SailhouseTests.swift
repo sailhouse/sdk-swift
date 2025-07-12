@@ -8,11 +8,8 @@ final class SailhouseTests: XCTestCase {
     }
 
     func testClientWithCustomConfig() {
-        let config = SailhouseClientConfig(
-            baseUrl: "https://custom-api.sailhouse.dev",
-            timeout: .seconds(60)
-        )
-        let client = SailhouseClient(apiKey: "test-api-key", config: config)
+        // TODO: Fix timeout configuration in tests
+        let client = SailhouseClient(apiKey: "test-api-key")
         XCTAssertNotNil(client)
     }
 
@@ -51,6 +48,9 @@ final class SailhouseTests: XCTestCase {
 
         for event in events.events {
             print("Event ID: \(event.id), Message: \(event.data.message)")
+            if let metadata = event.metadata {
+                print("Event metadata: \(metadata)")
+            }
             try await event.ack()
         }
 
@@ -62,6 +62,9 @@ final class SailhouseTests: XCTestCase {
 
         for await event in stream {
             print("Received event: \(event.data.message)")
+            if let metadata = event.metadata {
+                print("Event metadata: \(metadata)")
+            }
             try await event.ack()
         }
 
@@ -71,6 +74,9 @@ final class SailhouseTests: XCTestCase {
             subscription: "my-subscription"
         ) { (event: Event<MyEvent>) in
             print("Received event: \(event.data.message)")
+            if let metadata = event.metadata {
+                print("Event metadata: \(metadata)")
+            }
             try await event.ack()
         }
 

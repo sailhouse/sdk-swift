@@ -1,5 +1,6 @@
 import Foundation
 import AsyncHTTPClient
+import NIOCore
 
 /// Configuration for the Sailhouse client
 public struct SailhouseClientConfig {
@@ -15,7 +16,7 @@ public struct SailhouseClientConfig {
     ///   - timeout: The timeout for HTTP requests
     public init(
         baseUrl: String = "https://api.sailhouse.dev",
-        timeout: HTTPClient.Configuration.Timeout = .seconds(30)
+        timeout: HTTPClient.Configuration.Timeout = HTTPClient.Configuration.Timeout(connect: .seconds(30), read: .seconds(30))
     ) {
         self.baseUrl = baseUrl
         self.timeout = timeout
