@@ -1,4 +1,5 @@
 import XCTest
+import AsyncHTTPClient
 @testable import Sailhouse
 
 final class SailhouseTests: XCTestCase {
@@ -8,8 +9,11 @@ final class SailhouseTests: XCTestCase {
     }
 
     func testClientWithCustomConfig() {
-        // TODO: Fix timeout configuration in tests
-        let client = SailhouseClient(apiKey: "test-api-key")
+        let customConfig = SailhouseClientConfig(
+            baseUrl: "https://test.sailhouse.dev",
+            timeout: HTTPClient.Configuration.Timeout(connect: .seconds(10), read: .seconds(20))
+        )
+        let client = SailhouseClient(apiKey: "test-api-key", config: customConfig)
         XCTAssertNotNil(client)
     }
 

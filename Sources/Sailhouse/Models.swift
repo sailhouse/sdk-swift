@@ -165,6 +165,41 @@ public struct EventsResponse<T: Decodable> {
     }
 }
 
+/// Represents a push subscription for receiving push notifications
+public struct PushSubscription: Codable {
+    /// The unique identifier of the push subscription
+    public let id: String
+    
+    /// The topic slug the subscription belongs to
+    public let topicSlug: String
+    
+    /// The subscription slug
+    public let subscriptionSlug: String
+    
+    /// The endpoint URL for push notifications
+    public let endpoint: String
+    
+    /// The p256dh key for encryption (optional)
+    public let p256dh: String?
+    
+    /// The auth key for encryption (optional)
+    public let auth: String?
+    
+    /// The timestamp when the subscription was created
+    public let createdAt: String
+    
+    /// The timestamp when the subscription was last updated
+    public let updatedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id, endpoint, p256dh, auth
+        case topicSlug = "topic_slug"
+        case subscriptionSlug = "subscription_slug"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
 /// Represents an event in the Sailhouse system
 public struct Event<T: Decodable> {
     /// The unique identifier of the event
