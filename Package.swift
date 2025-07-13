@@ -20,6 +20,7 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.15.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -28,6 +29,11 @@ let package = Package(
             name: "Sailhouse",
             dependencies: [
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOWebSocket", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOFoundationCompat", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
             ],
             path: "Sources/Sailhouse"),
         .testTarget(

@@ -3,7 +3,7 @@ import Foundation
 /// Options for publishing an event
 public struct PublishEventOptions {
     /// Additional metadata for the event
-    public let metadata: [String: String]?
+    public let metadata: [String: Any]?
 
     /// The time to send the event
     public let sendAt: Date?
@@ -12,7 +12,7 @@ public struct PublishEventOptions {
     /// - Parameters:
     ///   - metadata: Additional metadata for the event
     ///   - sendAt: The time to send the event
-    public init(metadata: [String: String]? = nil, sendAt: Date? = nil) {
+    public init(metadata: [String: Any]? = nil, sendAt: Date? = nil) {
         self.metadata = metadata
         self.sendAt = sendAt
     }
@@ -55,6 +55,66 @@ internal struct EventDTO<T: Decodable>: Decodable {
 
     /// The timestamp when the event was created
     let timestamp: String
+
+    /// Additional metadata for the event
+    let metadata: [String: Any]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, data, queryableValue, timestamp, metadata
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        data = try container.decode(T.self, forKey: .data)
+        queryableValue = try container.decode(String.self, forKey: .queryableValue)
+        timestamp = try container.decode(String.self, forKey: .timestamp)
+        
+        // Decode metadata as optional dictionary
+        if container.contains(.metadata) {
+            do {
+                if try !container.decodeNil(forKey: .metadata) {
+                    // Decode metadata as a nested container and extract values
+                    let metadataContainer = try container.nestedContainer(keyedBy: AnyCodingKey.self, forKey: .metadata)
+                    var metadataDict: [String: Any] = [:]
+                    
+                    for key in metadataContainer.allKeys {
+                        if let stringValue = try? metadataContainer.decode(String.self, forKey: key) {
+                            metadataDict[key.stringValue] = stringValue
+                        } else if let intValue = try? metadataContainer.decode(Int.self, forKey: key) {
+                            metadataDict[key.stringValue] = intValue
+                        } else if let doubleValue = try? metadataContainer.decode(Double.self, forKey: key) {
+                            metadataDict[key.stringValue] = doubleValue
+                        } else if let boolValue = try? metadataContainer.decode(Bool.self, forKey: key) {
+                            metadataDict[key.stringValue] = boolValue
+                        }
+                    }
+                    metadata = metadataDict.isEmpty ? nil : metadataDict
+                } else {
+                    metadata = nil
+                }
+            } catch {
+                metadata = nil
+            }
+        } else {
+            metadata = nil
+        }
+    }
+}
+
+private struct AnyCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+    
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+    
+    init?(intValue: Int) {
+        self.stringValue = String(intValue)
+        self.intValue = intValue
+    }
 }
 
 /// Internal representation of events response from the API
@@ -105,6 +165,41 @@ public struct EventsResponse<T: Decodable> {
     }
 }
 
+/// Represents a push subscription for receiving push notifications
+public struct PushSubscription: Codable {
+    /// The unique identifier of the push subscription
+    public let id: String
+    
+    /// The topic slug the subscription belongs to
+    public let topicSlug: String
+    
+    /// The subscription slug
+    public let subscriptionSlug: String
+    
+    /// The endpoint URL for push notifications
+    public let endpoint: String
+    
+    /// The p256dh key for encryption (optional)
+    public let p256dh: String?
+    
+    /// The auth key for encryption (optional)
+    public let auth: String?
+    
+    /// The timestamp when the subscription was created
+    public let createdAt: String
+    
+    /// The timestamp when the subscription was last updated
+    public let updatedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id, endpoint, p256dh, auth
+        case topicSlug = "topic_slug"
+        case subscriptionSlug = "subscription_slug"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
 /// Represents an event in the Sailhouse system
 public struct Event<T: Decodable> {
     /// The unique identifier of the event
@@ -118,6 +213,9 @@ public struct Event<T: Decodable> {
 
     /// The timestamp when the event was created
     public let timestamp: String
+
+    /// Additional metadata for the event
+    public let metadata: [String: Any]?
 
     /// The topic the event belongs to
     private let topic: String
@@ -144,6 +242,7 @@ public struct Event<T: Decodable> {
         self.data = dto.data
         self.queryableValue = dto.queryableValue
         self.timestamp = dto.timestamp
+        self.metadata = dto.metadata
         self.topic = topic
         self.subscription = subscription
         self.client = client

@@ -43,7 +43,7 @@ public class SailhouseClient {
         )
 
         self.httpClient = HTTPClient(
-            eventLoopGroupProvider: .createNew,
+            eventLoopGroupProvider: .singleton,
             configuration: httpClientConfig
         )
 
@@ -122,7 +122,7 @@ public class SailhouseClient {
         topic: String,
         event: T,
         sendAt: Date,
-        metadata: [String: String]? = nil
+        metadata: [String: Any]? = nil
     ) async throws -> String {
         return try await publish(
             topic: topic,
@@ -209,26 +209,35 @@ public class SailhouseClient {
         let bootstrap = ClientBootstrap(group: group)
             .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .channelInitializer { channel in
+                let websocketHandler = WebSocketHandler(
+                    topic: topic,
+                    subscription: subscription,
+                    apiKey: self.apiKey,
+                    clientId: clientId,
+                    options: options,
+                    handler: handler,
+                    decoder: self.decoder,
+                    logger: self.logger,
+                    client: self
+                )
+                
                 let websocketUpgrader = NIOWebSocketClientUpgrader(
                     requestKey: "sailhouse-swift-\(clientId)",
                     maxFrameSize: 1 << 24,
-                    automaticErrorHandling: true
-                ) { channel, _ in
-                    channel.pipeline.addHandler(WebSocketHandler(
-                        topic: topic,
-                        subscription: subscription,
-                        apiKey: self.apiKey,
-                        clientId: clientId,
-                        options: options,
-                        handler: handler,
-                        decoder: self.decoder,
-                        logger: self.logger,
-                        client: self
-                    ))
-                }
+                    automaticErrorHandling: true,
+                    upgradePipelineHandler: { channel, _ in
+                        channel.pipeline.addHandler(websocketHandler)
+                    }
+                )
 
-                return channel.pipeline.addHTTPClientHandlers().flatMap {
-                    channel.pipeline.addHandler(websocketUpgrader)
+                return channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes).flatMap { _ in
+                    channel.pipeline.addHandler(NIOHTTPClientUpgradeHandler(
+                        upgraders: [websocketUpgrader],
+                        httpHandlers: [],
+                        upgradeCompletionHandler: { context in
+                            // Upgrade completed successfully
+                        }
+                    ))
                 }
             }
 
@@ -331,8 +340,10 @@ public class SailhouseClient {
 }
 
 /// WebSocket handler for streaming events
-private class WebSocketHandler<T: Decodable>: ChannelInboundHandler {
+private class WebSocketHandler<T: Decodable>: ChannelInboundHandler, ChannelOutboundHandler {
     typealias InboundIn = WebSocketFrame
+    typealias OutboundIn = WebSocketFrame
+    typealias OutboundOut = WebSocketFrame
 
     private let topic: String
     private let subscription: String
@@ -393,7 +404,7 @@ private class WebSocketHandler<T: Decodable>: ChannelInboundHandler {
         buffer.writeString(text)
 
         let frame = WebSocketFrame(fin: true, opcode: .text, data: buffer)
-        context.writeAndFlush(self.wrapOutboundOut(frame), promise: nil)
+        context.writeAndFlush(NIOAny(frame), promise: nil)
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -401,8 +412,8 @@ private class WebSocketHandler<T: Decodable>: ChannelInboundHandler {
 
         switch frame.opcode {
         case .text:
-            guard let data = frame.unmaskedData,
-                  let text = data.getString(at: 0, length: data.readableBytes) else {
+            let data = frame.unmaskedData
+            guard let text = data.getString(at: 0, length: data.readableBytes) else {
                 logger.warning("Received invalid text frame")
                 return
             }
@@ -424,7 +435,7 @@ private class WebSocketHandler<T: Decodable>: ChannelInboundHandler {
             }
         case .ping:
             let pong = WebSocketFrame(fin: true, opcode: .pong, data: frame.data)
-            context.writeAndFlush(self.wrapOutboundOut(pong), promise: nil)
+            context.writeAndFlush(NIOAny(pong), promise: nil)
         case .connectionClose:
             context.close(promise: nil)
         default:
